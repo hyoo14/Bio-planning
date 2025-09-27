@@ -1,3 +1,57 @@
+
+
+# Parse reactions file and get product2reactant and reactant2product
+
+import csv
+from collections import defaultdict
+
+def key_from_side(side: str) -> tuple:
+    """'.'로 분리 → 공백 제거 → 정렬 → tuple 키(멀티셋)"""
+    parts = [p.strip() for p in side.split(".") if p.strip()]
+    parts.sort()
+    return tuple(parts)  # 예: ("A","A","B")
+
+def parse_reaction_line(line: str):
+    """SMILES 반응식 'A.B>>C' 형태를 (reactants, products)로 분리"""
+    if ">>" not in line:
+        return None
+    left, right = line.split(">>", 1)
+    return left.strip(), right.strip()
+
+def build_maps_from_csv(csv_file):
+    r2p = defaultdict(list)  # { reactants_key: [(id, product)] }
+    p2r = defaultdict(list)  # { products_key: [(id, reactants)] }
+
+    with open(csv_file, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)  # , delimiter="\t"  # 탭 구분 CSV
+        for row in reader:
+            rid = row["id"]
+            smiles = row["smiles_original"]
+            parsed = parse_reaction_line(smiles)
+            if not parsed:
+                continue
+            L, R = parsed
+            kL = key_from_side(L)
+            kR = key_from_side(R)
+
+            r2p[kL].append((rid, R))
+            p2r[kR].append((rid, L))
+
+    return dict(r2p), dict(p2r)
+
+def lookup_products(reactants_str: str, r2p: dict):
+    """주어진 reactants로 만들 수 있는 (id, product) 리스트 반환"""
+    return r2p.get(key_from_side(reactants_str), [])
+
+def lookup_reactants(products_str: str, p2r: dict):
+    """주어진 products로 만들 수 있는 (id, reactants) 리스트 반환"""
+    return p2r.get(key_from_side(products_str), [])
+
+csv_file =  OUTPUT_FILE
+reactants_to_products, products_to_reactants = build_maps_from_csv(csv_file)
+
+
+
 # filtering reaction files
 
 from rdkit import Chem
